@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { format, toZonedTime } from "npm:date-fns-tz";
+import { formatInTimeZone } from "npm:date-fns-tz";
 import { ptBR } from "npm:date-fns/locale";
 
 const corsHeaders = {
@@ -177,15 +177,13 @@ serve(async (req) => {
       // 5. Send Confirmation Email via Gmail API
       let emailSent = false;
       try {
-           // Format date/time in Brazil timezone using date-fns-tz
+           // Format date/time in Brazil timezone using dedicated formatInTimeZone function
            const startDate = new Date(booking_details.start_time);
+           const timeZone = 'America/Sao_Paulo';
            
-           // Convert to Brazil timezone explicitly
-           const zonedDate = toZonedTime(startDate, 'America/Sao_Paulo');
-           
-           // Format using pt-BR locale
-           const formattedDate = format(zonedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
-           const formattedTime = format(zonedDate, "HH:mm", { locale: ptBR });
+           // Format using pt-BR locale directly with timezone
+           const formattedDate = formatInTimeZone(startDate, timeZone, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
+           const formattedTime = formatInTimeZone(startDate, timeZone, "HH:mm", { locale: ptBR });
            
            // Capitalize first letter of day
            const finalDateStr = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
