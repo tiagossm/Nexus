@@ -1,10 +1,45 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { format, toZonedTime } from "npm:date-fns-tz";
+import { ptBR } from "npm:date-fns/locale";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// =====================================================
+// UTILITY FUNCTIONS FOR EMAIL ENCODING
+// =====================================================
+
+// RFC 2047 encoding for email headers with non-ASCII characters
+function encodeRFC2047(str: string): string {
+  if (/^[\x20-\x7E]*$/.test(str)) {
+    return str;
+  }
+  const base64 = base64Encode(str);
+  return `=?UTF-8?B?${base64}?=`;
+}
+
+// Base64 encode with UTF-8 support
+function base64Encode(str: string): string {
+  const utf8Bytes = new TextEncoder().encode(str);
+  let binary = '';
+  utf8Bytes.forEach(byte => binary += String.fromCharCode(byte));
+  return btoa(binary);
+}
+
+// Base64url encode for Gmail API (RFC 4648)
+function base64UrlEncode(str: string): string {
+  const utf8Bytes = new TextEncoder().encode(str);
+  let binary = '';
+  utf8Bytes.forEach(byte => binary += String.fromCharCode(byte));
+  
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -142,20 +177,18 @@ serve(async (req) => {
       // 5. Send Confirmation Email via Gmail API
       let emailSent = false;
       try {
-           // Format date/time in Brazil timezone
+           // Format date/time in Brazil timezone using date-fns-tz
            const startDate = new Date(booking_details.start_time);
-           const formattedDate = startDate.toLocaleDateString('pt-BR', { 
-               timeZone: 'America/Sao_Paulo',
-               weekday: 'long',
-               day: 'numeric',
-               month: 'long',
-               year: 'numeric'
-           });
-           const formattedTime = startDate.toLocaleTimeString('pt-BR', { 
-               timeZone: 'America/Sao_Paulo',
-               hour: '2-digit', 
-               minute:'2-digit'
-           });
+           
+           // Convert to Brazil timezone explicitly
+           const zonedDate = toZonedTime(startDate, 'America/Sao_Paulo');
+           
+           // Format using pt-BR locale
+           const formattedDate = format(zonedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
+           const formattedTime = format(zonedDate, "HH:mm", { locale: ptBR });
+           
+           // Capitalize first letter of day
+           const finalDateStr = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
            
            const subject = `Confirmação de Agendamento: ${campaign.title}`;
            const htmlBody = `
@@ -164,7 +197,7 @@ serve(async (req) => {
                     <p>Olá <strong>${booking_details.client_name}</strong>,</p>
                     <p>Seu agendamento para <strong>${campaign.title}</strong> foi confirmado com sucesso.</p>
                     <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <p style="margin: 5px 0;"><strong>📅 Data:</strong> ${formattedDate}</p>
+                        <p style="margin: 5px 0;"><strong>📅 Data:</strong> ${finalDateStr}</p>
                         <p style="margin: 5px 0;"><strong>⏰ Horário:</strong> ${formattedTime}</p>
                     </div>
                     <p>Um convite foi enviado para sua agenda Google.</p>
@@ -172,22 +205,23 @@ serve(async (req) => {
                 </div>
            `;
            
-           const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
-           const messageParts = [
+           // Correctly encode headers and body
+           const encodedSubject = encodeRFC2047(subject);
+           const encodedBody = base64Encode(htmlBody);
+
+           const emailParts = [
              `From: "Nexus Agenda" <${account.email}>`,
              `To: ${booking_details.client_email}`,
-             `Subject: ${utf8Subject}`,
+             `Subject: ${encodedSubject}`,
              `MIME-Version: 1.0`,
              `Content-Type: text/html; charset=utf-8`,
+             `Content-Transfer-Encoding: base64`,
              ``,
-             htmlBody
-           ];
-           const message = messageParts.join('\n');
-           // Base64Url Encode
-           const encodedMessage = btoa(unescape(encodeURIComponent(message)))
-             .replace(/\+/g, '-')
-             .replace(/\//g, '_')
-             .replace(/=+$/, '');
+             encodedBody
+           ].join('\r\n');
+
+           // Base64Url Encode for Gmail API
+           const rawMessage = base64UrlEncode(emailParts);
              
            const emailResp = await fetch(`${GOOGLE_API}/gmail/v1/users/me/messages/send`, {
              method: 'POST',
@@ -195,7 +229,7 @@ serve(async (req) => {
                Authorization: `Bearer ${account.access_token}`,
                'Content-Type': 'application/json',
              },
-             body: JSON.stringify({ raw: encodedMessage })
+             body: JSON.stringify({ raw: rawMessage })
            });
            
            if (emailResp.ok) {
