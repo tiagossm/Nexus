@@ -99,74 +99,79 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    // Initialize auth state - SIMPLIFIED to prevent hanging
+    // Initialize auth state
     useEffect(() => {
-        console.log('[Auth] Initializing...');
         let mounted = true;
 
-        if (!isSupabaseConfigured()) {
-            console.log('[Auth] Supabase not configured, skipping auth');
-            setLoading(false);
-            return;
-        }
+        const initAuth = async () => {
+            console.log('[Auth] Initializing...');
 
-        // If no auth event after 3s, explicitly call getSession to trigger it
-        const timeoutId = setTimeout(async () => {
-            if (mounted) {
-                console.warn('[Auth] No auth event yet, calling getSession...');
-                try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    console.log('[Auth] getSession result:', session ? 'has session' : 'no session');
-                    // onAuthStateChange should fire after this, but if it doesn't:
-                    if (!session) {
-                        setLoading(false);
+            if (!isSupabaseConfigured()) {
+                console.log('[Auth] Supabase not configured, skipping auth');
+                if (mounted) setLoading(false);
+                return;
+            }
+
+            try {
+                // 1. Check active session immediately
+                const { data: { session }, error } = await supabase.auth.getSession();
+
+                if (error) throw error;
+
+                if (mounted) {
+                    if (session) {
+                        console.log('[Auth] Session found:', session.user.email);
+                        setSession(session);
+                        setUser(session.user);
+
+                        // Fetch profile
+                        const profileData = await fetchProfile(session.user.id);
+                        if (mounted) {
+                            setProfile(profileData);
+                            // Update last login
+                            updateLastLogin(session.user.id);
+                        }
+                    } else {
+                        console.log('[Auth] No active session found');
                     }
-                } catch (err) {
-                    console.error('[Auth] getSession error:', err);
+                }
+            } catch (error) {
+                console.error('[Auth] Initialization error:', error);
+            } finally {
+                if (mounted) {
+                    console.log('[Auth] Initialization complete');
                     setLoading(false);
                 }
             }
-        }, 3000);
+        };
 
-        // Listen for auth changes - this is the ONLY mechanism we use
+        initAuth();
+
+        // 2. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!mounted) return;
-
             console.log('[Auth] State changed:', event);
-            clearTimeout(timeoutId);
 
             setSession(session);
             setUser(session?.user ?? null);
 
             if (session?.user) {
-                console.log('[Auth] User logged in:', session.user.email);
-
-                // Fetch profile - simple, no timeout racing
+                // Only fetch profile if we don't have it or if it's a different user
+                // (Optional optimization, but safe to fetch always for consistency)
                 const profileData = await fetchProfile(session.user.id);
-                console.log('[Auth] Profile:', profileData ? 'found' : 'not found');
-                if (mounted) setProfile(profileData);
-
-                if (event === 'SIGNED_IN') {
-                    updateLastLogin(session.user.id);
-                    // Clean OAuth hash from URL
-                    if (window.location.hash.includes('access_token')) {
-                        window.history.replaceState(null, '', window.location.pathname);
-                    }
+                if (mounted) {
+                    setProfile(profileData);
                 }
             } else {
-                setProfile(null);
+                if (mounted) setProfile(null);
             }
 
-            // ALWAYS set loading to false after any auth event
-            if (mounted) {
-                console.log('[Auth] Setting loading to false after:', event);
-                setLoading(false);
-            }
+            // Ensure loading is false after any event (redundant safety)
+            if (mounted) setLoading(false);
         });
 
         return () => {
             mounted = false;
-            clearTimeout(timeoutId);
             subscription.unsubscribe();
         };
     }, []);
