@@ -216,7 +216,11 @@ const App: React.FC = () => {
       />
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <Header onOpenCreate={() => setIsCreateModalOpen(true)} />
+        <Header
+          onOpenCreate={() => setIsCreateModalOpen(true)}
+          onOpenProfile={() => setIsPublicProfileOpen(true)}
+          onNavigate={setActiveView}
+        />
 
         <main className="flex-1 p-8 pt-6 overflow-y-auto scroll-smooth">
           {/* Aviso de Configuração (Só aparece se não configurado) */}

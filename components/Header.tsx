@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from './Icons';
 import { useAuth } from '../contexts/AuthContext';
+import { ViewState } from '../types';
 
 interface HeaderProps {
   onOpenCreate?: () => void;
+  onOpenProfile?: () => void;
+  onNavigate?: (view: ViewState) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenCreate }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenCreate, onOpenProfile, onNavigate }) => {
   const { profile, signOut, isSuperAdmin } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -40,8 +43,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreate }) => {
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    window.location.href = '/';
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Erro ao sair:", error);
+    } finally {
+      // Force redirect even if signOut API fails
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -95,16 +104,25 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreate }) => {
 
               {/* Menu Items */}
               <div className="py-2">
-                <button className="w-full px-4 py-2.5 flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors text-left">
+                <button
+                  onClick={() => { setIsDropdownOpen(false); onOpenProfile?.(); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                >
                   <Icons.User className="w-4 h-4 text-slate-400" />
                   <span className="text-sm">Meu Perfil</span>
                 </button>
-                <button className="w-full px-4 py-2.5 flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors text-left">
+                <button
+                  onClick={() => { setIsDropdownOpen(false); onNavigate?.(ViewState.AVAILABILITY); }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                >
                   <Icons.Settings className="w-4 h-4 text-slate-400" />
                   <span className="text-sm">Configurações</span>
                 </button>
                 {isSuperAdmin && (
-                  <button className="w-full px-4 py-2.5 flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors text-left">
+                  <button
+                    onClick={() => { setIsDropdownOpen(false); onNavigate?.(ViewState.ADMIN); }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                  >
                     <Icons.Shield className="w-4 h-4 text-slate-400" />
                     <span className="text-sm">Painel Admin</span>
                   </button>
