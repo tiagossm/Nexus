@@ -142,6 +142,21 @@ serve(async (req) => {
       // 5. Send Confirmation Email via Gmail API
       let emailSent = false;
       try {
+           // Format date/time in Brazil timezone
+           const startDate = new Date(booking_details.start_time);
+           const formattedDate = startDate.toLocaleDateString('pt-BR', { 
+               timeZone: 'America/Sao_Paulo',
+               weekday: 'long',
+               day: 'numeric',
+               month: 'long',
+               year: 'numeric'
+           });
+           const formattedTime = startDate.toLocaleTimeString('pt-BR', { 
+               timeZone: 'America/Sao_Paulo',
+               hour: '2-digit', 
+               minute:'2-digit'
+           });
+           
            const subject = `Confirmação de Agendamento: ${campaign.title}`;
            const htmlBody = `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
@@ -149,8 +164,8 @@ serve(async (req) => {
                     <p>Olá <strong>${booking_details.client_name}</strong>,</p>
                     <p>Seu agendamento para <strong>${campaign.title}</strong> foi confirmado com sucesso.</p>
                     <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <p style="margin: 5px 0;"><strong>📅 Data:</strong> ${new Date(booking_details.start_time).toLocaleDateString('pt-BR')}</p>
-                        <p style="margin: 5px 0;"><strong>⏰ Horário:</strong> ${new Date(booking_details.start_time).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</p>
+                        <p style="margin: 5px 0;"><strong>📅 Data:</strong> ${formattedDate}</p>
+                        <p style="margin: 5px 0;"><strong>⏰ Horário:</strong> ${formattedTime}</p>
                     </div>
                     <p>Um convite foi enviado para sua agenda Google.</p>
                     <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">Este é um email automático.</p>

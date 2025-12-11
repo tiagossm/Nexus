@@ -338,15 +338,30 @@ export const BookingModal: React.FC<BookingModalProps> = ({ event, onClose, pref
                                 <Icons.Check size={40} strokeWidth={3} />
                             </div>
                             <h3 className="text-2xl font-bold text-slate-900 mb-2">Agendamento Confirmado!</h3>
-                            <p className="text-slate-600 mb-8 max-w-xs mx-auto">
+                            <p className="text-slate-600 mb-4 max-w-xs mx-auto">
                                 Enviamos um e-mail de confirmação para <strong>{email}</strong> com todos os detalhes.
                             </p>
-                            <button
-                                onClick={onClose}
-                                className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all hover:scale-105"
-                            >
-                                Fechar
-                            </button>
+
+                            {/* Show booking details */}
+                            <div className="bg-indigo-50 p-6 rounded-xl mb-6 text-left max-w-sm w-full">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <Icons.CalendarDays className="text-indigo-600" size={24} />
+                                    <div>
+                                        <p className="font-bold text-indigo-900">
+                                            {selectedDate?.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                        </p>
+                                        <p className="text-indigo-700">{getFormattedTimeRange()}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 text-slate-600">
+                                    <Icons.Clock size={18} />
+                                    <span className="text-sm">{event.duration} minutos</span>
+                                </div>
+                            </div>
+
+                            <p className="text-sm text-slate-500">
+                                Verifique seu e-mail para mais informações.
+                            </p>
                         </div>
                     ) : viewState === 'form' ? (
                         <div className="max-w-md mx-auto animate-in slide-in-from-right duration-300">
