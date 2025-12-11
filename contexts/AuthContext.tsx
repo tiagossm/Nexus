@@ -113,8 +113,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
 
             try {
-                // 1. Check active session immediately
-                const { data: { session }, error } = await supabase.auth.getSession();
+                // 1. Check active session immediately with timeout
+                // Create a promise that rejects after 2 seconds
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Session check timed out')), 2000)
+                );
+
+                // Race getSession against the timeout
+                const { data: { session }, error } = await Promise.race([
+                    supabase.auth.getSession(),
+                    timeoutPromise
+                ]) as any;
 
                 if (error) throw error;
 
@@ -136,10 +145,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
                 }
             } catch (error) {
-                console.error('[Auth] Initialization error:', error);
+                console.error('[Auth] Initialization error or timeout:', error);
+                // Even on error/timeout, we must stop loading to allow the user to try logging in again
             } finally {
                 if (mounted) {
-                    console.log('[Auth] Initialization complete');
+                    console.log('[Auth] Initialization complete (finally)');
                     setLoading(false);
                 }
             }
