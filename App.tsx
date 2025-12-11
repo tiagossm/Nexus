@@ -17,11 +17,14 @@ import { CompanyManager } from './components/CompanyManager';
 import { MessageTemplateManager } from './components/MessageTemplateManager';
 import { PublicBookingPage } from './components/PublicBookingPage';
 import { CalendarView } from './components/CalendarView';
+import { AuthPage } from './components/AuthPage';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Icons } from './components/Icons';
 import { EventType, ViewState, UserProfile, Contact } from './types';
 import { isSupabaseConfigured } from './services/supabaseClient';
 import { getEvents, createEvent, updateEventStatus } from './services/supabaseService';
 import { useDebounce } from './hooks/useDebounce';
+import { useAuth } from './contexts/AuthContext';
 
 // Mock Initial Data (usado apenas se o Supabase não estiver configurado)
 const INITIAL_USER: UserProfile = {
@@ -56,6 +59,8 @@ const DEMO_EVENTS: EventType[] = [
 ];
 
 const App: React.FC = () => {
+  const { isAuthenticated, isApproved, loading: authLoading, profile, signOut } = useAuth();
+
   const [activeView, setActiveView] = useState<ViewState>(ViewState.SCHEDULING);
   const [events, setEvents] = useState<EventType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,6 +90,37 @@ const App: React.FC = () => {
       setRecipientId(bookMatch[1]);
     }
   }, []);
+
+  // PUBLIC BOOKING PAGES - Don't require auth
+  if (isPublicBooking && recipientId) {
+    return <PublicBookingPage recipientId={recipientId} />;
+  }
+
+  // AUTH LOADING STATE
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // NOT AUTHENTICATED - Show login page
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
+  // AWAITING APPROVAL - Show pending state
+  if (!isApproved) {
+    return (
+      <ProtectedRoute requireApproval={true}>
+        <div />
+      </ProtectedRoute>
+    );
+  }
 
   // Carregar eventos do Supabase
   useEffect(() => {
