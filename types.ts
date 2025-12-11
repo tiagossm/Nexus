@@ -32,6 +32,7 @@ export enum ViewState {
   WORKFLOWS = 'Fluxos de trabalho',
   INTEGRATIONS = 'Integrações e apps',
   ROUTING = 'Roteamento',
+  NEXUS_IA = 'Nexus AI',
   ANALYTICS = 'Análises',
   ADMIN = 'Centro de administração',
   HELP = 'Ajuda'

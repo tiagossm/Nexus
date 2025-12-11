@@ -87,3 +87,24 @@ export const generateEventDetails = async (prompt: string): Promise<AIMeetingSug
     };
   }
 };
+
+export const generateResponse = async (prompt: string, systemInstruction?: string): Promise<string> => {
+   if (!apiKey) {
+    throw new Error('Gemini API key não configurada.');
+  }
+
+  try {
+     const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction || "Você é a Nexus IA, assistente inteligente do sistema Nexus Agenda.",
+      }
+    });
+
+    return response.text || "Sem resposta da IA.";
+  } catch (error) {
+    console.error("Erro na Nexus IA:", error);
+    throw new Error("Falha ao processar solicitação com a IA.");
+  }
+}

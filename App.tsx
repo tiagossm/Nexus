@@ -16,6 +16,7 @@ import { ExamManager } from './components/ExamManager';
 import { CompanyManager } from './components/CompanyManager';
 import { UserManagement } from './components/UserManagement';
 import { MessageTemplateManager } from './components/MessageTemplateManager';
+import { NexusIA } from './components/NexusIA';
 import { PublicBookingPage } from './components/PublicBookingPage';
 import { OAuthSuccessPage } from './components/OAuthSuccessPage';
 import { CalendarView } from './components/CalendarView';
@@ -392,6 +393,11 @@ const App: React.FC = () => {
           {/* Users Management View */}
           {activeView === ViewState.USERS && (
             <UserManagement />
+          )}
+
+          {/* Nexus IA View */}
+          {activeView === ViewState.NEXUS_IA && (
+            <NexusIA />
           )}
 
           {/* Other Views Placeholder */}

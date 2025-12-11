@@ -113,6 +113,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
         <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2 mt-8">Automação</div>
 
         <NavItem
+          view={ViewState.NEXUS_IA}
+          icon={<Icons.Sparkles size={18} />}
+          active={activeView === ViewState.NEXUS_IA}
+          onClick={() => setActiveView(ViewState.NEXUS_IA)}
+        />
+
+        <NavItem
           view={ViewState.WORKFLOWS}
           icon={<Icons.Workflow size={18} />}
           active={activeView === ViewState.WORKFLOWS}
