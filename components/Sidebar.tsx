@@ -103,6 +103,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
           active={activeView === ViewState.COMPANIES}
           onClick={() => setActiveView(ViewState.COMPANIES)}
         />
+        <NavItem
+          view={ViewState.USERS}
+          icon={<Icons.Users size={18} />}
+          active={activeView === ViewState.USERS}
+          onClick={() => setActiveView(ViewState.USERS)}
+        />
 
         <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 mb-2 mt-8">Automação</div>
 

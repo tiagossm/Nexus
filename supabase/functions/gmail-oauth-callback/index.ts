@@ -119,30 +119,15 @@ serve(async (req) => {
       throw dbError;
     }
 
-    // Return success page
-    return new Response(
-      `<html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-            h1 { color: #4CAF50; }
-            p { font-size: 18px; color: #666; }
-          </style>
-        </head>
-        <body>
-          <h1>✅ Gmail conectado com sucesso!</h1>
-          <p>Conta: <strong>${email}</strong></p>
-          <p>Você pode fechar esta janela e voltar para o aplicativo.</p>
-          <script>
-            // Auto-close after 3 seconds
-            setTimeout(() => {
-              window.close();
-            }, 3000);
-          </script>
-        </body>
-      </html>`,
-      { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
-    );
+    // Redirect to app's OAuth success page
+    // Use APP_URL env var for production, fallback to localhost for dev
+    const appUrl = Deno.env.get("APP_URL") || "http://localhost:3000";
+    const successUrl = `${appUrl}/oauth-success?email=${encodeURIComponent(email)}`;
+    
+    return new Response(null, {
+      status: 302,
+      headers: { "Location": successUrl }
+    });
   } catch (error) {
     console.error("Error in OAuth callback:", error);
     return new Response(

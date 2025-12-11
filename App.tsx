@@ -14,8 +14,10 @@ import { CampaignManager } from './components/CampaignManager';
 import { ClinicManager } from './components/ClinicManager';
 import { ExamManager } from './components/ExamManager';
 import { CompanyManager } from './components/CompanyManager';
+import { UserManagement } from './components/UserManagement';
 import { MessageTemplateManager } from './components/MessageTemplateManager';
 import { PublicBookingPage } from './components/PublicBookingPage';
+import { OAuthSuccessPage } from './components/OAuthSuccessPage';
 import { CalendarView } from './components/CalendarView';
 import { AuthPage } from './components/AuthPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -89,44 +91,26 @@ const App: React.FC = () => {
       setIsPublicBooking(true);
       setRecipientId(bookMatch[1]);
     }
+
+    // Check for OAuth success page
+    if (path === '/oauth-success') {
+      return; // Will be handled by isOAuthSuccess state
+    }
+
+    // Check for Gmail connection success
+    const urlParams = new URLSearchParams(window.location.search);
+    const gmailConnected = urlParams.get('gmail_connected');
+    const connectedEmail = urlParams.get('email');
+    if (gmailConnected === 'true' && connectedEmail) {
+      import('sonner').then(({ toast }) => {
+        toast.success(`Gmail conectado: ${connectedEmail}`);
+      });
+      // Clean URL
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }, []);
 
-  // PUBLIC BOOKING PAGES - Don't require auth
-  if (isPublicBooking && recipientId) {
-    return <PublicBookingPage recipientId={recipientId} />;
-  }
-
-  // AUTH LOADING STATE
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // NOT AUTHENTICATED - Show login page
-  if (!isAuthenticated) {
-    return <AuthPage />;
-  }
-
-  // AWAITING APPROVAL - Show pending state
-  if (!isApproved) {
-    return (
-      <ProtectedRoute requireApproval={true}>
-        <div />
-      </ProtectedRoute>
-    );
-  }
-
-  // Carregar eventos do Supabase
-  useEffect(() => {
-    fetchEvents();
-  }, []);
-
+  // Define fetchEvents before useEffect
   const fetchEvents = async () => {
     setIsLoading(true);
 
@@ -148,6 +132,30 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Load events on mount - this hook must be before any conditional returns
+  useEffect(() => {
+    if (isAuthenticated && isApproved) {
+      fetchEvents();
+    }
+  }, [isAuthenticated, isApproved]);
+
+  // Memoized filtered events
+  const filteredEvents = useMemo(() => {
+    return events.filter(e =>
+      e.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    );
+  }, [events, debouncedSearchQuery]);
+
+  // OAuth Success Page - render without auth
+  if (window.location.pathname === '/oauth-success') {
+    return <OAuthSuccessPage />;
+  }
+
+  // PUBLIC BOOKING PAGES - Don't require auth (this is okay to keep)
+  if (isPublicBooking && recipientId) {
+    return <PublicBookingPage recipientId={recipientId} />;
+  }
 
   const handleAddEvent = async (newEvent: EventType) => {
     const previousEvents = [...events];
@@ -197,16 +205,6 @@ const App: React.FC = () => {
     setSelectedEventForBooking(event);
   };
 
-  const filteredEvents = useMemo(() => {
-    return events.filter(e =>
-      e.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-    );
-  }, [events, debouncedSearchQuery]);
-
-  // If we're on a public booking page, render only that
-  if (isPublicBooking && recipientId) {
-    return <PublicBookingPage recipientId={recipientId} />;
-  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -217,7 +215,7 @@ const App: React.FC = () => {
       />
 
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <Header user={INITIAL_USER} onOpenCreate={() => setIsCreateModalOpen(true)} />
+        <Header onOpenCreate={() => setIsCreateModalOpen(true)} />
 
         <main className="flex-1 p-8 pt-6 overflow-y-auto scroll-smooth">
           {/* Aviso de Configuração (Só aparece se não configurado) */}
@@ -391,6 +389,11 @@ const App: React.FC = () => {
             <CompanyManager />
           )}
 
+          {/* Users Management View */}
+          {activeView === ViewState.USERS && (
+            <UserManagement />
+          )}
+
           {/* Other Views Placeholder */}
           {activeView !== ViewState.SCHEDULING &&
             activeView !== ViewState.MEETINGS &&
@@ -402,6 +405,7 @@ const App: React.FC = () => {
             activeView !== ViewState.CLINICS &&
             activeView !== ViewState.EXAMS &&
             activeView !== ViewState.COMPANIES &&
+            activeView !== ViewState.USERS &&
             activeView !== ViewState.CALENDAR && (
               <div className="bg-white border border-slate-200 rounded-2xl p-16 flex flex-col items-center justify-center text-center shadow-sm">
                 <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center mb-6 rotate-3">

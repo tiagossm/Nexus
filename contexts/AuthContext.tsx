@@ -58,6 +58,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Fetch user profile from our profiles table
     const fetchProfile = async (userId: string) => {
+        console.log('[Auth] fetchProfile called for:', userId);
         if (!isSupabaseConfigured()) return null;
 
         try {
@@ -72,6 +73,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return null;
             }
 
+            console.log('[Auth] fetchProfile result:', data);
             return data as UserProfile;
         } catch (err) {
             console.error('Error in fetchProfile:', err);
@@ -97,46 +99,76 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    // Initialize auth state
+    // Initialize auth state - SIMPLIFIED to prevent hanging
     useEffect(() => {
+        console.log('[Auth] Initializing...');
+        let mounted = true;
+
         if (!isSupabaseConfigured()) {
+            console.log('[Auth] Supabase not configured, skipping auth');
             setLoading(false);
             return;
         }
 
-        // Get initial session
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-
-            if (session?.user) {
-                const profileData = await fetchProfile(session.user.id);
-                setProfile(profileData);
-                updateLastLogin(session.user.id);
+        // If no auth event after 3s, explicitly call getSession to trigger it
+        const timeoutId = setTimeout(async () => {
+            if (mounted) {
+                console.warn('[Auth] No auth event yet, calling getSession...');
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    console.log('[Auth] getSession result:', session ? 'has session' : 'no session');
+                    // onAuthStateChange should fire after this, but if it doesn't:
+                    if (!session) {
+                        setLoading(false);
+                    }
+                } catch (err) {
+                    console.error('[Auth] getSession error:', err);
+                    setLoading(false);
+                }
             }
+        }, 3000);
 
-            setLoading(false);
-        });
-
-        // Listen for auth changes
+        // Listen for auth changes - this is the ONLY mechanism we use
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth state changed:', event);
+            if (!mounted) return;
+
+            console.log('[Auth] State changed:', event);
+            clearTimeout(timeoutId);
+
             setSession(session);
             setUser(session?.user ?? null);
 
             if (session?.user) {
+                console.log('[Auth] User logged in:', session.user.email);
+
+                // Fetch profile - simple, no timeout racing
                 const profileData = await fetchProfile(session.user.id);
-                setProfile(profileData);
+                console.log('[Auth] Profile:', profileData ? 'found' : 'not found');
+                if (mounted) setProfile(profileData);
 
                 if (event === 'SIGNED_IN') {
                     updateLastLogin(session.user.id);
+                    // Clean OAuth hash from URL
+                    if (window.location.hash.includes('access_token')) {
+                        window.history.replaceState(null, '', window.location.pathname);
+                    }
                 }
             } else {
                 setProfile(null);
             }
+
+            // ALWAYS set loading to false after any auth event
+            if (mounted) {
+                console.log('[Auth] Setting loading to false after:', event);
+                setLoading(false);
+            }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            clearTimeout(timeoutId);
+            subscription.unsubscribe();
+        };
     }, []);
 
     // Sign in with Google
@@ -210,7 +242,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         profile,
         session,
         loading,
-        isAuthenticated: !!user && !!profile,
+        // User is authenticated if they have a valid session (profile is for permissions)
+        isAuthenticated: !!user,
         isApproved: !!profile?.is_approved,
         signInWithGoogle,
         signInWithEmail,

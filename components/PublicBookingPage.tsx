@@ -30,6 +30,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
             setError(null);
 
             // 1. Fetch recipient data
+            console.log('🔄 [BookingPage] Step 1: Fetching recipient...');
             const recipient = await getRecipient(recipientId);
             if (!recipient) {
                 setError('Link de agendamento inválido ou expirado.');
@@ -37,7 +38,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
             }
 
             setRecipientData(recipient);
-            console.log('👤 Recipient Data Loaded:', recipient);
+            console.log('✅ [BookingPage] Step 1 complete - Recipient loaded:', recipient.id);
 
             // Track click - update status if not already clicked/booked
             if (recipient.status === 'sent' || recipient.status === 'opened' || recipient.status === 'pending') {
@@ -50,6 +51,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
             }
 
             // 2. Fetch campaign data
+            console.log('🔄 [BookingPage] Step 2: Fetching campaign...');
             const campaign = await campaignService.getCampaign(recipient.campaign_id);
             if (!campaign) {
                 setError('Campanha não encontrada.');
@@ -57,17 +59,19 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
             }
 
             setCampaignData(campaign);
+            console.log('✅ [BookingPage] Step 2 complete - Campaign loaded:', campaign.id);
 
             // 3. Fetch event type (if campaign has one)
             let finalEvent: EventType;
 
             if (campaign.event_type_id) {
+                console.log('🔄 [BookingPage] Step 3: Fetching events...');
                 const events = await getEvents();
+                console.log('✅ [BookingPage] Step 3 complete - Events:', events?.length || 0);
                 const eventType = events.find(e => e.id === campaign.event_type_id);
 
                 if (eventType) {
                     console.log('✅ Found event type:', eventType.title);
-                    console.log('📝 Campaign availability config:', campaign.custom_availability);
                     finalEvent = {
                         ...eventType,
                         custom_availability: campaign.custom_availability || eventType.custom_availability
@@ -78,7 +82,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
                     finalEvent = {
                         id: campaign.id,
                         title: campaign.title || 'Agendamento',
-                        duration: campaign.custom_availability?.duration || 60, // Read from campaign config
+                        duration: 60,
                         location: 'A definir',
                         type: 'One-on-One',
                         active: true,
@@ -90,10 +94,11 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
                 }
             } else {
                 // Create a default event from campaign data
+                console.log('🔄 [BookingPage] No event_type_id, creating default event');
                 finalEvent = {
                     id: campaign.id,
                     title: campaign.title || 'Agendamento',
-                    duration: campaign.custom_availability?.duration || 60, // Read from campaign config
+                    duration: 60,
                     location: 'A definir',
                     type: 'One-on-One',
                     active: true,
@@ -104,12 +109,14 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
                 };
             }
 
+            console.log('✅ [BookingPage] All data loaded, setting event');
             setEvent(finalEvent);
 
         } catch (err) {
             console.error('Erro ao carregar dados de agendamento:', err);
             setError('Erro ao carregar informações. Tente novamente mais tarde.');
         } finally {
+            console.log('🏁 [BookingPage] Loading complete');
             setLoading(false);
         }
     };

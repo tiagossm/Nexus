@@ -12,8 +12,11 @@ import {
   Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Image,
   // New icons for multichannel
   MessageCircle, Smartphone, CheckCircle, XCircle, MousePointer,
-  CheckCheck, Award, XOctagon, UserMinus, Circle, ChevronUp, Lock
+  CheckCheck, Award, XOctagon, UserMinus, Circle, ChevronUp, Lock,
+  // Icons for auth
+  Shield, LogOut
 } from 'lucide-react';
+
 
 
 // Define a type for icon props if not already defined elsewhere
@@ -101,5 +104,8 @@ export const Icons = {
   UserMinus,
   Circle,
   ChevronUp,
-  Lock
+  Lock,
+  // Auth icons
+  Shield,
+  LogOut
 };

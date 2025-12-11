@@ -28,6 +28,7 @@ export enum ViewState {
   CLINICS = 'Clínicas',
   EXAMS = 'Exames',
   COMPANIES = 'Empresas',
+  USERS = 'Usuários',
   WORKFLOWS = 'Fluxos de trabalho',
   INTEGRATIONS = 'Integrações e apps',
   ROUTING = 'Roteamento',

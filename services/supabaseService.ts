@@ -18,6 +18,10 @@ export const getEvents = async (): Promise<EventType[]> => {
 export const createEvent = async (event: EventType): Promise<void> => {
     if (!isSupabaseConfigured()) return;
 
+    // Get current user for ownership
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { error } = await supabase
         .from('events')
         .insert([{
@@ -29,7 +33,8 @@ export const createEvent = async (event: EventType): Promise<void> => {
             active: event.active,
             color: event.color,
             url: event.url,
-            description: event.description
+            description: event.description,
+            owner_id: user.id // Add ownership
         }]);
 
     if (error) throw error;
@@ -63,9 +68,13 @@ export const getContacts = async (): Promise<Contact[]> => {
 export const createContact = async (contact: Partial<Contact>): Promise<Contact | null> => {
     if (!isSupabaseConfigured()) return null;
 
+    // Get current user for ownership
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
         .from('contacts')
-        .insert([contact])
+        .insert([{ ...contact, owner_id: user.id }])
         .select()
         .single();
 
@@ -98,9 +107,16 @@ export const updateContactByEmail = async (email: string, updates: Partial<Conta
 export const upsertContacts = async (contacts: Partial<Contact>[]): Promise<void> => {
     if (!isSupabaseConfigured()) return;
 
+    // Get current user for ownership
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Add owner_id to each contact
+    const contactsWithOwner = contacts.map(c => ({ ...c, owner_id: user.id }));
+
     const { error } = await supabase
         .from('contacts')
-        .upsert(contacts, { onConflict: 'email' });
+        .upsert(contactsWithOwner, { onConflict: 'email' });
 
     if (error) throw error;
 };
