@@ -176,6 +176,16 @@ serve(async (req) => {
       // B. Send Confirmation Email via Gmail API (Always try)
       let emailSent = false;
       try {
+           // Get the booking to retrieve access_code
+           const { data: bookingData } = await supabase
+             .from("campaign_bookings")
+             .select("access_code")
+             .eq("id", booking_id)
+             .single();
+           
+           const accessCode = bookingData?.access_code || '';
+           const appUrl = Deno.env.get("APP_URL") || "https://nexusagenda.vercel.app";
+           const manageLink = accessCode ? `${appUrl}/my-bookings/${accessCode}` : null;
            // Format date/time in Brazil timezone using dedicated formatInTimeZone function
            const startDate = new Date(booking_details.start_time);
            const timeZone = 'America/Sao_Paulo';
@@ -198,6 +208,12 @@ serve(async (req) => {
                         <p style="margin: 5px 0;"><strong>⏰ Horário:</strong> ${formattedTime}</p>
                     </div>
                     ${googleEventId ? '<p>Um convite foi enviado para sua agenda Google.</p>' : ''}
+                    ${manageLink ? `
+                    <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0; color: #92400e;"><strong>📋 Gerenciar seu agendamento:</strong></p>
+                        <p style="margin: 10px 0 0 0;"><a href="${manageLink}" style="color: #4f46e5; font-weight: bold;">Clique aqui para cancelar ou remarcar</a></p>
+                    </div>
+                    ` : ''}
                     <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">Este é um email automático.</p>
                 </div>
            `;

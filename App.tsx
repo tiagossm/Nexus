@@ -18,6 +18,7 @@ import { UserManagement } from './components/UserManagement';
 import { MessageTemplateManager } from './components/MessageTemplateManager';
 import { NexusIA } from './components/NexusIA';
 import { PublicBookingPage } from './components/PublicBookingPage';
+import { MyBookingsPage } from './components/MyBookingsPage';
 import { OAuthSuccessPage } from './components/OAuthSuccessPage';
 import { CalendarView } from './components/CalendarView';
 import { AuthPage } from './components/AuthPage';
@@ -84,6 +85,10 @@ const App: React.FC = () => {
   const [isPublicBooking, setIsPublicBooking] = useState(false);
   const [recipientId, setRecipientId] = useState<string | null>(null);
 
+  // Check if we're on the my-bookings management page
+  const [isMyBookingsPage, setIsMyBookingsPage] = useState(false);
+  const [bookingAccessCode, setBookingAccessCode] = useState<string | null>(null);
+
   useEffect(() => {
     // Simple client-side routing for /book/:recipientId
     const path = window.location.pathname;
@@ -91,6 +96,13 @@ const App: React.FC = () => {
     if (bookMatch) {
       setIsPublicBooking(true);
       setRecipientId(bookMatch[1]);
+    }
+
+    // Check for /my-bookings/:accessCode route (public booking management)
+    const myBookingsMatch = path.match(/^\/my-bookings\/([a-zA-Z0-9]+)$/);
+    if (myBookingsMatch) {
+      setIsMyBookingsPage(true);
+      setBookingAccessCode(myBookingsMatch[1]);
     }
 
     // Check for OAuth success page
@@ -151,6 +163,11 @@ const App: React.FC = () => {
   // OAuth Success Page - render without auth
   if (window.location.pathname === '/oauth-success') {
     return <OAuthSuccessPage />;
+  }
+
+  // PUBLIC BOOKING MANAGEMENT - Don't require auth
+  if (isMyBookingsPage && bookingAccessCode) {
+    return <MyBookingsPage accessCode={bookingAccessCode} />;
   }
 
   // PUBLIC BOOKING PAGES - Don't require auth (this is okay to keep)

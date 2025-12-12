@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, supabaseAnon } from './supabaseClient';
 import { googleCalendarService } from './googleCalendarService';
 import { emailService } from './emailService';
 
@@ -22,6 +22,7 @@ export interface CampaignBooking {
   soc_protocolo?: string;
   soc_sync_status?: 'pending' | 'synced' | 'error' | 'not_applicable';
   soc_response?: any;
+  access_code?: string; // Unique code for public booking management
   created_at: string;
   updated_at: string;
   // Joined data
@@ -290,5 +291,168 @@ export const campaignBookingService = {
     });
 
     return stats;
+  },
+
+  // =====================================================
+  // PUBLIC ACCESS FUNCTIONS (No auth required)
+  // =====================================================
+
+  /**
+   * Get booking by access code (public, no auth required)
+   * Uses supabaseAnon to bypass any session
+   */
+  async getBookingByAccessCode(accessCode: string): Promise<CampaignBooking | null> {
+    const { data, error } = await supabaseAnon
+      .from('campaign_bookings')
+      .select(`
+        *,
+        campaign:campaigns(id, title, clinic_id, custom_availability)
+      `)
+      .eq('access_code', accessCode)
+      .single();
+
+    if (error) {
+      console.error('[PublicAccess] Error fetching booking by access code:', error);
+      return null;
+    }
+    return data;
+  },
+
+  /**
+   * Cancel booking by access code (public)
+   */
+  async cancelBookingByAccessCode(accessCode: string, reason?: string): Promise<CampaignBooking | null> {
+    // First, get the booking to verify it exists and is cancellable
+    const booking = await this.getBookingByAccessCode(accessCode);
+    if (!booking) {
+      throw new Error('Agendamento não encontrado.');
+    }
+
+    if (booking.status === 'cancelled') {
+      throw new Error('Este agendamento já foi cancelado.');
+    }
+
+    if (booking.status === 'completed') {
+      throw new Error('Não é possível cancelar um agendamento já realizado.');
+    }
+
+    // Cancel the booking using supabaseAnon
+    const { data, error } = await supabaseAnon
+      .from('campaign_bookings')
+      .update({
+        status: 'cancelled',
+        cancellation_reason: reason || 'Cancelado pelo cliente'
+      })
+      .eq('access_code', accessCode)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[PublicAccess] Error cancelling booking:', error);
+      throw new Error('Erro ao cancelar agendamento.');
+    }
+
+    return data;
+  },
+
+  /**
+   * Reschedule booking by access code (public)
+   */
+  async rescheduleBookingByAccessCode(
+    accessCode: string,
+    newStartTime: Date,
+    newEndTime: Date
+  ): Promise<CampaignBooking | null> {
+    // Get current booking
+    const booking = await this.getBookingByAccessCode(accessCode);
+    if (!booking) {
+      throw new Error('Agendamento não encontrado.');
+    }
+
+    if (booking.status === 'cancelled') {
+      throw new Error('Não é possível remarcar um agendamento cancelado.');
+    }
+
+    if (booking.status === 'completed') {
+      throw new Error('Não é possível remarcar um agendamento já realizado.');
+    }
+
+    // Check if new slot is available (exclude current booking)
+    const { data: conflicts, error: conflictError } = await supabaseAnon
+      .from('campaign_bookings')
+      .select('id')
+      .eq('campaign_id', booking.campaign_id)
+      .neq('access_code', accessCode)
+      .neq('status', 'cancelled')
+      .gte('start_time', newStartTime.toISOString())
+      .lt('end_time', newEndTime.toISOString());
+
+    if (conflictError) {
+      console.error('[PublicAccess] Error checking slot availability:', conflictError);
+      throw new Error('Erro ao verificar disponibilidade.');
+    }
+
+    if (conflicts && conflicts.length > 0) {
+      throw new Error('Este horário já está ocupado. Por favor, escolha outro.');
+    }
+
+    // Update the booking with new time
+    const { data, error } = await supabaseAnon
+      .from('campaign_bookings')
+      .update({
+        start_time: newStartTime.toISOString(),
+        end_time: newEndTime.toISOString(),
+        status: 'confirmed' // Reset to confirmed if was rescheduled before
+      })
+      .eq('access_code', accessCode)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[PublicAccess] Error rescheduling booking:', error);
+      throw new Error('Erro ao remarcar agendamento.');
+    }
+
+    return data;
+  },
+
+  /**
+   * Get available slots for rescheduling (public)
+   */
+  async getAvailableSlotsForReschedule(
+    accessCode: string,
+    date: Date
+  ): Promise<string[]> {
+    const booking = await this.getBookingByAccessCode(accessCode);
+    if (!booking) {
+      throw new Error('Agendamento não encontrado.');
+    }
+
+    // Get booked slots for the campaign on this date (excluding current booking)
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const { data: bookedSlots, error } = await supabaseAnon
+      .from('campaign_bookings')
+      .select('start_time')
+      .eq('campaign_id', booking.campaign_id)
+      .neq('access_code', accessCode) // Exclude current booking
+      .neq('status', 'cancelled')
+      .gte('start_time', startOfDay.toISOString())
+      .lte('start_time', endOfDay.toISOString());
+
+    if (error) {
+      console.error('[PublicAccess] Error fetching booked slots:', error);
+      return [];
+    }
+
+    // Return array of booked HH:mm times
+    return (bookedSlots || []).map(b => {
+      const d = new Date(b.start_time);
+      return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    });
   }
 };
