@@ -64,16 +64,7 @@ serve(async (req) => {
       throw new Error("Campaign not found");
     }
 
-    if (!campaign.google_calendar_id) {
-      return new Response(
-        JSON.stringify({ message: "No Google Calendar linked to this campaign" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // 2. Fetch Owner's Tokens (Assuming single user or primary account)
-    // In a multi-user app, we'd need to link campaign -> user explicitly.
-    // Here we'll take the most recently updated active 'gmail' account.
     const { data: accounts, error: accountError } = await supabase
       .from("user_email_accounts")
       .select("*")
@@ -134,47 +125,55 @@ serve(async (req) => {
       account.access_token = newTokens.access_token;
     }
 
-
-
     // 4. Perform Action
-    const calendarId = campaign.google_calendar_id;
     const GOOGLE_API = "https://www.googleapis.com";
+    let googleEventId = null;
 
     if (action === "create_event") {
-      const event = {
-        summary: `${booking_details.client_name} - ${campaign.title || 'Consulta'}`,
-        description: `Cliente: ${booking_details.client_name}\nEmail: ${booking_details.client_email}\nTel: ${booking_details.client_phone || 'N/A'}\n\nAgendado via Nexus Agenda.`,
-        start: { dateTime: booking_details.start_time },
-        end: { dateTime: booking_details.end_time },
-        attendees: [
-            { email: booking_details.client_email, displayName: booking_details.client_name }
-        ],
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 },
-            { method: 'popup', minutes: 10 },
-          ],
-        },
-      };
+      // A. Create Calendar Event (Only if calendar_id is present)
+      if (campaign.google_calendar_id) {
+          try {
+            const calendarId = campaign.google_calendar_id;
+            const event = {
+                summary: `${booking_details.client_name} - ${campaign.title || 'Consulta'}`,
+                description: `Cliente: ${booking_details.client_name}\nEmail: ${booking_details.client_email}\nTel: ${booking_details.client_phone || 'N/A'}\n\nAgendado via Nexus Agenda.`,
+                start: { dateTime: booking_details.start_time },
+                end: { dateTime: booking_details.end_time },
+                attendees: [
+                    { email: booking_details.client_email, displayName: booking_details.client_name }
+                ],
+                reminders: {
+                useDefault: false,
+                overrides: [
+                    { method: 'email', minutes: 24 * 60 },
+                    { method: 'popup', minutes: 10 },
+                ],
+                },
+            };
 
-      const resp = await fetch(`${GOOGLE_API}/calendar/v3/calendars/${calendarId}/events`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${account.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(event),
-      });
+            const resp = await fetch(`${GOOGLE_API}/calendar/v3/calendars/${calendarId}/events`, {
+                method: "POST",
+                headers: {
+                Authorization: `Bearer ${account.access_token}`,
+                "Content-Type": "application/json",
+                },
+                body: JSON.stringify(event),
+            });
 
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(`Google API Error: ${JSON.stringify(err)}`);
+            if (!resp.ok) {
+                const err = await resp.json();
+                console.error(`Google Calendar API Error: ${JSON.stringify(err)}`);
+                // Don't throw, just log so we proceed to email
+            } else {
+                const googleEvent = await resp.json();
+                googleEventId = googleEvent.id;
+            }
+          } catch (calError) {
+              console.error("Error creating Calendar event:", calError);
+          }
       }
 
-      const googleEvent = await resp.json();
-
-      // 5. Send Confirmation Email via Gmail API
+      // B. Send Confirmation Email via Gmail API (Always try)
       let emailSent = false;
       try {
            // Format date/time in Brazil timezone using dedicated formatInTimeZone function
@@ -198,7 +197,7 @@ serve(async (req) => {
                         <p style="margin: 5px 0;"><strong>📅 Data:</strong> ${finalDateStr}</p>
                         <p style="margin: 5px 0;"><strong>⏰ Horário:</strong> ${formattedTime}</p>
                     </div>
-                    <p>Um convite foi enviado para sua agenda Google.</p>
+                    ${googleEventId ? '<p>Um convite foi enviado para sua agenda Google.</p>' : ''}
                     <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">Este é um email automático.</p>
                 </div>
            `;
@@ -241,17 +240,24 @@ serve(async (req) => {
           console.error("Error sending email:", emailErr);
       }
 
-      // Update booking with Google Event ID
-      await supabase
-        .from("campaign_bookings")
-        .update({
-          google_event_id: googleEvent.id,
-          google_synced_at: new Date().toISOString()
-        })
-        .eq("id", booking_id);
+      // Update booking with Google Event ID if created
+      if (googleEventId) {
+          await supabase
+            .from("campaign_bookings")
+            .update({
+              google_event_id: googleEventId,
+              google_synced_at: new Date().toISOString()
+            })
+            .eq("id", booking_id);
+      }
 
       return new Response(
-        JSON.stringify({ success: true, google_event_id: googleEvent.id }),
+        JSON.stringify({ 
+            success: true, 
+            google_event_id: googleEventId,
+            emailSent: emailSent,
+            emailError: emailSent ? null : "Check function logs for details" 
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
 

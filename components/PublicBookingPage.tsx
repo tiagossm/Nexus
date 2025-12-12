@@ -29,10 +29,26 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
             setLoading(true);
             setError(null);
 
-            // 1. Fetch recipient data
+            // 1. Fetch recipient data with timeout
             console.log('🔄 [BookingPage] Step 1: Fetching recipient...');
-            const recipient = await getRecipient(recipientId);
+
+            // Add timeout to prevent infinite loading
+            const recipientPromise = getRecipient(recipientId);
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout: Servidor demorou demais para responder')), 15000)
+            );
+
+            let recipient;
+            try {
+                recipient = await Promise.race([recipientPromise, timeoutPromise]);
+            } catch (fetchErr: any) {
+                console.error('❌ [BookingPage] Failed to fetch recipient:', fetchErr);
+                setError(fetchErr.message || 'Erro ao carregar dados do destinatário.');
+                return;
+            }
+
             if (!recipient) {
+                console.error('❌ [BookingPage] Recipient not found for ID:', recipientId);
                 setError('Link de agendamento inválido ou expirado.');
                 return;
             }

@@ -66,13 +66,29 @@ export const fetchCampaignRecipients = async (campaignId: string) => {
 
 /** Fetch a single recipient by ID, including contact data */
 export const getRecipient = async (recipientId: string) => {
-  if (!isSupabaseConfigured()) return null;
-  const { data, error } = await supabase
+  console.log('[RecipientService] getRecipient called with ID:', recipientId);
+  
+  if (!isSupabaseConfigured()) {
+    console.warn('[RecipientService] Supabase not configured!');
+    return null;
+  }
+  
+  // Use anonymous client to avoid auth blocking
+  const { supabaseAnon } = await import('./supabaseClient');
+  
+  console.log('[RecipientService] Querying with ANON client...');
+  const { data, error } = await supabaseAnon
     .from('campaign_recipients')
     .select('*, contacts(*)')
     .eq('id', recipientId)
     .single();
-  if (error) throw error;
+  
+  if (error) {
+    console.error('[RecipientService] Query error:', error);
+    throw error;
+  }
+  
+  console.log('[RecipientService] Query success, data:', data ? 'Found' : 'Null');
   return data;
 };
 

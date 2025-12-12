@@ -114,9 +114,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             try {
                 // 1. Check active session immediately with timeout
-                // Create a promise that rejects after 2 seconds
+                // Create a promise that rejects after 8 seconds (increased from 2s to handle slow connections)
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Session check timed out')), 2000)
+                    setTimeout(() => reject(new Error('Session check timed out')), 8000)
                 );
 
                 // Race getSession against the timeout
@@ -149,8 +149,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 // Even on error/timeout, we must stop loading to allow the user to try logging in again
             } finally {
                 if (mounted) {
-                    console.log('[Auth] Initialization complete (finally)');
-                    setLoading(false);
+                    // Only unset loading if we haven't already established a user via the listener
+                    // This prevents flickering if the race times out but the listener is working
+                    console.log('[Auth] Initialization check complete');
+                    setLoading(prev => {
+                        // If we already have a user from the listener, don't force false if the listener is still fetching profile
+                        // But since we can't easily know the listener state, we just ensure we stop the "initial" load spinner.
+                        return false;
+                    });
                 }
             }
         };
