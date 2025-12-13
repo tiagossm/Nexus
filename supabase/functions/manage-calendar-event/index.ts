@@ -56,7 +56,7 @@ serve(async (req) => {
     // 1. Fetch Campaign to get Google Calendar ID
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
-      .select("google_calendar_id, status") // User ID link is implicit via user_email_accounts logic below
+      .select("google_calendar_id, status, title") // Include title for email
       .eq("id", campaign_id)
       .single();
 
