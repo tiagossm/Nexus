@@ -81,29 +81,26 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'Tipos de evento' | 'Links únicos' | 'Votações'>('Tipos de evento');
 
-  // Check if we're on a public booking page
-  const [isPublicBooking, setIsPublicBooking] = useState(false);
-  const [recipientId, setRecipientId] = useState<string | null>(null);
+  // Check if we're on a public booking page - Lazy Initialization
+  const [isPublicBooking, setIsPublicBooking] = useState(() => {
+    return !!window.location.pathname.match(/^\/book\/([a-zA-Z0-9-]+)$/);
+  });
+  const [recipientId, setRecipientId] = useState<string | null>(() => {
+    const match = window.location.pathname.match(/^\/book\/([a-zA-Z0-9-]+)$/);
+    return match ? match[1] : null;
+  });
 
-  // Check if we're on the my-bookings management page
-  const [isMyBookingsPage, setIsMyBookingsPage] = useState(false);
-  const [bookingAccessCode, setBookingAccessCode] = useState<string | null>(null);
+  // Check if we're on the my-bookings management page - Lazy Initialization
+  const [isMyBookingsPage, setIsMyBookingsPage] = useState(() => {
+    return !!window.location.pathname.match(/^\/my-bookings\/([a-zA-Z0-9]+)$/);
+  });
+  const [bookingAccessCode, setBookingAccessCode] = useState<string | null>(() => {
+    const match = window.location.pathname.match(/^\/my-bookings\/([a-zA-Z0-9]+)$/);
+    return match ? match[1] : null;
+  });
 
   useEffect(() => {
-    // Simple client-side routing for /book/:recipientId
     const path = window.location.pathname;
-    const bookMatch = path.match(/^\/book\/([a-zA-Z0-9-]+)$/);
-    if (bookMatch) {
-      setIsPublicBooking(true);
-      setRecipientId(bookMatch[1]);
-    }
-
-    // Check for /my-bookings/:accessCode route (public booking management)
-    const myBookingsMatch = path.match(/^\/my-bookings\/([a-zA-Z0-9]+)$/);
-    if (myBookingsMatch) {
-      setIsMyBookingsPage(true);
-      setBookingAccessCode(myBookingsMatch[1]);
-    }
 
     // Check for OAuth success page
     if (path === '/oauth-success') {

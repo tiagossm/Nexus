@@ -68,7 +68,7 @@ export const PublicBookingPage: React.FC<PublicBookingPageProps> = ({ recipientI
 
             // 2. Fetch campaign data
             console.log('🔄 [BookingPage] Step 2: Fetching campaign...');
-            const campaign = await campaignService.getCampaign(recipient.campaign_id);
+            const campaign = await campaignService.getPublicCampaign(recipient.campaign_id);
             if (!campaign) {
                 setError('Campanha não encontrada.');
                 return;

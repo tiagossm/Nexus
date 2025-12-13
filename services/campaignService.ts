@@ -1,4 +1,5 @@
-import { supabase } from './supabaseClient';
+```javascript
+import { supabase, supabaseAnon } from './supabaseClient';
 
 import { Campaign, CampaignRecipient } from '../types';
 

@@ -116,7 +116,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 // 1. Check active session immediately with timeout
                 // Create a promise that rejects after 8 seconds (increased from 2s to handle slow connections)
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Session check timed out')), 8000)
+                    setTimeout(() => reject(new Error('Session check timed out')), 15000)
                 );
 
                 // Race getSession against the timeout
